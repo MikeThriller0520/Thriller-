@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>thriller — player management</title>
+<link rel="icon" href="logo.svg" />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@380;520;640&display=swap" rel="stylesheet" />
+<style>
+  body { margin:0; font-family:Outfit,sans-serif; background:#07070b; color:#f4f2f8; }
+  .wrap { max-width:860px; margin:0 auto; padding:22px; }
+  header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  a { color:#ff5cab; text-decoration:none; }
+  h1 { font-weight:520; margin-bottom:4px; }
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:18px 0 28px; }
+  .card { border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:14px; background:#12121a; }
+  .card b { display:block; font-size:22px; margin-top:4px; }
+  .sub { color:#9a97a6; font-size:13px; }
+  .player { border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:14px; margin-top:10px; background:#12121a; }
+  .top { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+  button { font-family:inherit; background:linear-gradient(90deg,#ff2d8a,#8b5cff); color:#fff; border:0; border-radius:999px; padding:8px 12px; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+  td { padding:6px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+  .hit { color:#3ee0a0; } .miss { color:#ff5d73; } .wait { color:#b794ff; }
+  @media (max-width:700px) { .cards { grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="index.html"><img src="logo.svg" alt="thriller" style="height:42px" /></a>
+    <a href="admin.html">Slate</a>
+  </header>
+  <h1>Player management</h1>
+  <p class="sub">Balance is on every account. Win/loss is for tickets settled today. A withdrawal is a request only. It does not pay out.</p>
+  <div class="cards" id="cards"></div>
+  <h2>Withdrawal requests</h2>
+  <div id="withdrawals" class="sub">None yet.</div>
+  <div id="players"></div>
+</div>
+<script>
+function money(n) { return "$" + Number(n || 0).toFixed(2); }
+function status(s) {
+  if (s === "won") return `<span class="hit">won</span>`;
+  if (s === "lost") return `<span class="miss">miss</span>`;
+  if (s === "refund") return `<span class="wait">push</span>`;
+  return `<span class="wait">${s}</span>`;
+}
+async function load() {
+  const report = await fetch("/api/report").then((r) => r.json());
+  const book = report.totals || {};
+  const balances = report.balances || {};
+  const day = report.day || {};
+  const ratio = day.ratio == null ? "—" : Math.round(day.ratio * 100) + "%";
+  document.getElementById("cards").innerHTML = [
+    ["Players", balances.players || 0],
+    ["Balances", money(balances.balances)],
+    ["Today win/loss", `${day.wins || 0}-${day.losses || 0}`],
+    ["Today win rate", ratio],
+    ["Staked", money(book.staked)],
+    ["Still open", money(book.open_stake)]
+  ].map(([label, value]) => `<div class="card"><div class="sub">${label}</div><b>${value}</b></div>`).join("");
+  document.getElementById("withdrawals").innerHTML = (report.withdrawals || []).length
+    ? (report.withdrawals || []).map((w) => `<div class="player"><b>${w.email}</b> requested ${money(w.amount)} · ${w.status}</div>`).join("")
+    : `<p class="sub">No withdrawal requests.</p>`;
+  document.getElementById("players").innerHTML = (report.players || []).map((a) => {
+    const dayRate = a.day_ratio == null ? "no settled tickets today" : `${a.day_wins}-${a.day_losses} today · ${Math.round(a.day_ratio * 100)}%`;
+    const tickets = (a.tickets || []).map((t) => `<tr><td>#${t.id} · $${t.price}</td><td>${status(t.status)}</td><td>${money(t.payout)}</td></tr>`).join("") || `<tr><td class="sub">No draws yet.</td><td></td><td></td></tr>`;
+    return `<article class="player"><div class="top"><div><b>${a.email}</b><div class="sub">Balance ${money(a.balance)} · ${dayRate}</div></div><div><button type="button" data-credit="${a.id}">Add $50 test</button></div></div><table>${tickets}</table></article>`;
+  }).join("") || `<p class="sub">No accounts yet.</p>`;
+}
+document.getElementById("players").onclick = async (e) => {
+  const btn = e.target.closest("[data-credit]");
+  if (!btn) return;
+  const res = await fetch("/api/credit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: "thriller", user_id: Number(btn.dataset.credit), amount: 50 }) });
+  if (!res.ok) { alert("Could not add the test credit"); return; }
+  load();
+};
+load();
+</script>
+</body>
+</html>
