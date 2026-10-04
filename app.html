@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>thriller draw</title>
+<link rel="icon" href="logo.svg"/><style>
+body{margin:0;font-family:sans-serif;background:#07070b;color:#fff}.app{max-width:480px;margin:0 auto;padding:16px}
+button,input{font:inherit}button{border:0;border-radius:999px;padding:12px;color:#fff;background:#222;cursor:pointer}
+.primary{background:linear-gradient(90deg,#ff2d8a,#8b5cff)}.leg{background:#17171f;border-radius:12px;padding:10px;margin-top:8px}
+.sub{color:#9a97a6;font-size:14px}.hit{color:#3ee0a0}.miss{color:#ff5d73}
+</style></head><body><div class="app">
+<header style="display:flex;justify-content:space-between;align-items:center"><img src="logo.svg" alt="thriller" style="height:42px"/><b id="bal">$0.00</b></header>
+<div id="gate"><b>Log in</b><p class="sub">Play money. New accounts start at $100.</p>
+<input id="email" placeholder="Email" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;border:0"/>
+<input id="password" type="password" placeholder="Password" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:0"/>
+<button class="primary" id="login" type="button">Log in</button>
+<button id="signup" type="button">Create account</button><p class="sub" id="msg"></p></div>
+<div id="play" hidden><p class="sub">Four NFL legs. All four hit, 12x.</p>
+<div id="prices"></div><div id="stage"></div><div id="actions"></div><div id="list"></div></div>
+<script>
+const PRICES=[1,5,10,20,50]; let token=localStorage.getItem('thriller-token')||''; let price=10; let pending=null;
+const money=n=>'$'+Number(n).toFixed(2);
+async function account(path){
+  const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value})});
+  const data=await res.json(); if(!res.ok){msg.textContent=data.error||'Could not log in'; return;}
+  token=data.token; localStorage.setItem('thriller-token',token); gate.hidden=true; play.hidden=false; refresh();
+}
+login.onclick=()=>account('/api/login'); signup.onclick=()=>account('/api/signup');
+async function refresh(){
+  const res=await fetch('/api/tickets',{headers:{Authorization:'Bearer '+token}}); if(res.status===401) return;
+  const data=await res.json(); bal.textContent=money(data.balance); render(data.tickets||[]);
+}
+async function draw(){
+  const res=await fetch('/api/draw',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({price})});
+  const data=await res.json(); if(!res.ok){alert(data.error||'Draw failed'); return;} pending=data.ticket; bal.textContent=money(data.balance); render();
+}
+async function again(){ if(pending) await fetch('/api/discard',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({id:pending.id})}); pending=null; draw(); }
+function render(tickets){
+  prices.innerHTML=PRICES.map(p=>`<button class="${p===price?'primary':''}" data-p="${p}">$${p}</button>`).join(' ');
+  prices.onclick=e=>{const b=e.target.closest('[data-p]'); if(!b||pending) return; price=Number(b.dataset.p); render(tickets);};
+  if(!pending){stage.innerHTML=`<button class="primary" id="go" type="button">Tap to draw $${price}</button>`; actions.innerHTML=''; setTimeout(()=>{const g=document.getElementById('go'); if(g) g.onclick=draw;},0);}
+  else {stage.innerHTML=pending.legs.map(l=>`<div class="leg"><b>${l.label}</b><div class="sub">${l.game}</div></div>`).join(''); actions.innerHTML='<button id="keep">Keep</button> <button id="again">Draw again</button>'; keep.onclick=()=>{pending=null; refresh();}; again.onclick=again;}
+  if(tickets) list.innerHTML=tickets.map(t=>`<div class="leg"><b>$${t.price} · ${t.status}</b>${t.legs.map(l=>`<div class="${l.result==='hit'?'hit':l.result==='miss'?'miss':''}">${l.label} · ${l.result}</div>`).join('')}</div>`).join('');
+}
+</script></div></body></html>
