@@ -1,42 +1,101 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>thriller draw</title>
-<link rel="icon" href="logo.svg"/><style>
-body{margin:0;font-family:sans-serif;background:#07070b;color:#fff}.app{max-width:480px;margin:0 auto;padding:16px}
-button,input{font:inherit}button{border:0;border-radius:999px;padding:12px;color:#fff;background:#222;cursor:pointer}
-.primary{background:linear-gradient(90deg,#ff2d8a,#8b5cff)}.leg{background:#17171f;border-radius:12px;padding:10px;margin-top:8px}
-.sub{color:#9a97a6;font-size:14px}.hit{color:#3ee0a0}.miss{color:#ff5d73}
-</style></head><body><div class="app">
-<header style="display:flex;justify-content:space-between;align-items:center"><img src="logo.svg" alt="thriller" style="height:42px"/><b id="bal">$0.00</b></header>
-<div id="gate"><b>Log in</b><p class="sub">Play money. New accounts start at $100.</p>
-<input id="email" placeholder="Email" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;border:0"/>
-<input id="password" type="password" placeholder="Password" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:0"/>
-<button class="primary" id="login" type="button">Log in</button>
-<button id="signup" type="button">Create account</button><p class="sub" id="msg"></p></div>
-<div id="play" hidden><p class="sub">Four NFL legs. All four hit, 12x.</p>
-<div id="prices"></div><div id="stage"></div><div id="actions"></div><div id="list"></div></div>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>thriller draw</title>
+<link rel="icon" href="logo.svg" />
+<style>
+:root { --pink:#ff2d8a; --purple:#8b5cff; --ink:#07070b; --muted:#9a97a6; --line:rgba(255,255,255,.08); --good:#3ee0a0; --bad:#ff5d73; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:sans-serif; background:var(--ink); color:#f4f2f8; }
+.app { max-width:480px; margin:0 auto; min-height:100vh; padding:16px 16px 40px; }
+header { display:flex; justify-content:space-between; align-items:center; }
+.bal { border:1px solid var(--line); border-radius:999px; padding:8px 12px; }
+.sub { color:var(--muted); font-size:14px; }
+.prices { display:flex; gap:8px; margin:16px 0; }
+button { font:inherit; cursor:pointer; border-radius:999px; border:1px solid var(--line); background:transparent; color:#fff; padding:10px 12px; }
+.on, .primary { background:linear-gradient(90deg,var(--pink),var(--purple)); border:0; }
+.pack { margin-top:8px; border-radius:22px; min-height:260px; padding:18px; background:linear-gradient(160deg,#2a1238,#120814 50%,#1a0c28); border:1px solid rgba(255,255,255,.12); display:flex; flex-direction:column; justify-content:space-between; }
+.seal { align-self:flex-start; background:var(--pink); border-radius:999px; padding:5px 10px; font-size:11px; }
+.pack h2 { font-size:36px; margin:12px 0; }
+.leg { display:grid; grid-template-columns:40px 1fr auto; gap:10px; align-items:center; background:#17171f; border:1px solid var(--line); border-radius:12px; padding:10px; margin-top:8px; }
+.logo { width:40px; height:40px; border-radius:50%; object-fit:cover; background:#111; }
+.actions { display:flex; gap:8px; margin-top:12px; }
+.actions button { flex:1; padding:12px; }
+.ticket { border:1px solid var(--line); border-radius:16px; padding:12px; margin-top:8px; }
+.hit { color:var(--good); } .miss { color:var(--bad); }
+</style>
+</head>
+<body>
+<div class="app">
+<header><img src="logo.svg" alt="thriller" style="height:42px" /><div class="bal" id="bal">$0.00</div><button id="cashier-btn" type="button" hidden>Cashier</button></header>
+<div id="gate" class="ticket" style="margin-top:18px">
+<b>Log in</b>
+<p class="sub">Play money. New accounts start at $100.</p>
+<input id="email" placeholder="Email" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#12121a;color:#fff" />
+<input id="password" type="password" placeholder="Password" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#12121a;color:#fff" />
+<div class="actions"><button class="primary" id="login" type="button">Log in</button><button id="signup" type="button">Create account</button></div>
+<p class="sub" id="gate-msg"></p>
+</div>
+<div id="play" hidden>
+<p class="sub">Four NFL legs. Four games. All four hit, 12x.</p>
+<div class="prices" id="prices"></div>
+<div id="stage"></div>
+<div class="actions" id="actions"></div>
+<section><b>My tickets</b><div id="list"></div></section>
+</div>
+</div>
 <script>
-const PRICES=[1,5,10,20,50]; let token=localStorage.getItem('thriller-token')||''; let price=10; let pending=null;
+const PRICES=[1,5,10,20,50];
+let token=localStorage.getItem('thriller-token')||'';
+let price=10, pending=null, tickets=[];
 const money=n=>'$'+Number(n).toFixed(2);
-async function account(path){
-  const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value})});
-  const data=await res.json(); if(!res.ok){msg.textContent=data.error||'Could not log in'; return;}
-  token=data.token; localStorage.setItem('thriller-token',token); gate.hidden=true; play.hidden=false; refresh();
+const TEAMS={giants:'nyg',bills:'buf',lions:'det',eagles:'phi',cowboys:'dal','49ers':'sf',niners:'sf',ravens:'bal',packers:'gb',chiefs:'kc',raiders:'lv',dolphins:'mia',bengals:'cin',jaguars:'jax',bears:'chi',jets:'nyj',broncos:'den',buccaneers:'tb',bucs:'tb',cardinals:'ari',chargers:'lac',seahawks:'sea',texans:'hou',titans:'ten',commanders:'wsh',saints:'no',falcons:'atl',panthers:'car',vikings:'min',rams:'lar',steelers:'pit',browns:'cle',colts:'ind',patriots:'ne'};
+function face(leg){
+  const text=((leg.label||'')+' '+(leg.game||'')).toLowerCase();
+  let code='nfl';
+  for (const [name,c] of Object.entries(TEAMS)) if (text.includes(name)) code=c;
+  if (code==='nfl') return '<div class="logo"></div>';
+  return `<img class="logo" src="https://a.espncdn.com/i/teamlogos/nfl/500/${code}.png" alt="${code}" />`;
 }
-login.onclick=()=>account('/api/login'); signup.onclick=()=>account('/api/signup');
+async function account(path){
+  const msg=document.getElementById('gate-msg');
+  msg.textContent='Signing in...';
+  const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value,password:document.getElementById('password').value})});
+  const data=await res.json();
+  if(!res.ok){ msg.textContent=data.error||'Could not log in'; return; }
+  token=data.token; localStorage.setItem('thriller-token',token);
+  document.getElementById('gate').hidden=true; document.getElementById('play').hidden=false; document.getElementById('cashier-btn').hidden=false; refresh();
+}
+document.getElementById('login').onclick=()=>account('/api/login');
+document.getElementById('signup').onclick=()=>account('/api/signup');
 async function refresh(){
-  const res=await fetch('/api/tickets',{headers:{Authorization:'Bearer '+token}}); if(res.status===401) return;
-  const data=await res.json(); bal.textContent=money(data.balance); render(data.tickets||[]);
+  const res=await fetch('/api/tickets',{headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}});
+  if(res.status===401) return;
+  const data=await res.json(); tickets=data.tickets||[]; document.getElementById('bal').textContent=money(data.balance); render();
 }
 async function draw(){
-  const res=await fetch('/api/draw',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({price})});
-  const data=await res.json(); if(!res.ok){alert(data.error||'Draw failed'); return;} pending=data.ticket; bal.textContent=money(data.balance); render();
+  const res=await fetch('/api/draw',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({price})});
+  const data=await res.json(); if(!res.ok){ alert(data.error||'Draw failed'); return; }
+  pending=data.ticket; document.getElementById('bal').textContent=money(data.balance); render();
 }
-async function again(){ if(pending) await fetch('/api/discard',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({id:pending.id})}); pending=null; draw(); }
-function render(tickets){
-  prices.innerHTML=PRICES.map(p=>`<button class="${p===price?'primary':''}" data-p="${p}">$${p}</button>`).join(' ');
-  prices.onclick=e=>{const b=e.target.closest('[data-p]'); if(!b||pending) return; price=Number(b.dataset.p); render(tickets);};
-  if(!pending){stage.innerHTML=`<button class="primary" id="go" type="button">Tap to draw $${price}</button>`; actions.innerHTML=''; setTimeout(()=>{const g=document.getElementById('go'); if(g) g.onclick=draw;},0);}
-  else {stage.innerHTML=pending.legs.map(l=>`<div class="leg"><b>${l.label}</b><div class="sub">${l.game}</div></div>`).join(''); actions.innerHTML='<button id="keep">Keep</button> <button id="again">Draw again</button>'; keep.onclick=()=>{pending=null; refresh();}; again.onclick=again;}
-  if(tickets) list.innerHTML=tickets.map(t=>`<div class="leg"><b>$${t.price} · ${t.status}</b>${t.legs.map(l=>`<div class="${l.result==='hit'?'hit':l.result==='miss'?'miss':''}">${l.label} · ${l.result}</div>`).join('')}</div>`).join('');
+function render(){
+  document.getElementById('prices').innerHTML=PRICES.map(p=>`<button class="${p===price?'on':''}" data-p="${p}" type="button">$${p}</button>`).join('');
+  const stage=document.getElementById('stage'); const actions=document.getElementById('actions');
+  if(!pending){
+    stage.innerHTML=`<button class="pack" id="go" type="button"><div class="seal">NFL · 12x</div><div><h2>$${price} draw</h2><p class="sub">Four NFL legs. All four hit, you win ${money(price*12)}.</p></div><b>Tap to draw</b></button>`;
+    actions.innerHTML=''; document.getElementById('go').onclick=draw;
+  } else {
+    stage.innerHTML=pending.legs.map(l=>`<div class="leg">${face(l)}<div><b>${l.label}</b><div class="sub">${l.game}</div></div><div>${l.need}</div></div>`).join('')+`<p class="sub">Keep it for ${money(pending.payout)}, or pay $${price} and draw another.</p>`;
+    actions.innerHTML='<button class="primary" id="keep" type="button">Keep</button><button id="again" type="button">Draw again</button>';
+    document.getElementById('keep').onclick=()=>{pending=null; refresh();};
+    document.getElementById('again').onclick=async()=>{ if(pending) await fetch('/api/discard',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({id:pending.id})}); pending=null; draw(); };
+  }
+  document.getElementById('list').innerHTML=tickets.length?tickets.map(t=>`<article class="ticket"><b>$${t.price} draw</b> <span class="${t.status==='won'?'hit':t.status==='lost'?'miss':''}">${t.status}</span>${t.legs.map(l=>`<div class="leg">${face(l)}<span>${l.label}</span><span>${l.result}</span></div>`).join('')}</article>`).join(''):'<p class="sub">No tickets yet.</p>';
 }
-</script></div></body></html>
+document.getElementById('prices').onclick=(e)=>{ const b=e.target.closest('[data-p]'); if(!b||pending) return; price=Number(b.dataset.p); render(); };
+if(token) refresh();
+</script>
+</body>
+</html>
