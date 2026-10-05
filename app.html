@@ -52,12 +52,21 @@ let token=localStorage.getItem('thriller-token')||'';
 let price=10, pending=null, tickets=[];
 const money=n=>'$'+Number(n).toFixed(2);
 const TEAMS={giants:'nyg',bills:'buf',lions:'det',eagles:'phi',cowboys:'dal','49ers':'sf',niners:'sf',ravens:'bal',packers:'gb',chiefs:'kc',raiders:'lv',dolphins:'mia',bengals:'cin',jaguars:'jax',bears:'chi',jets:'nyj',broncos:'den',buccaneers:'tb',bucs:'tb',cardinals:'ari',chargers:'lac',seahawks:'sea',texans:'hou',titans:'ten',commanders:'wsh',saints:'no',falcons:'atl',panthers:'car',vikings:'min',rams:'lar',steelers:'pit',browns:'cle',colts:'ind',patriots:'ne'};
-function face(leg){
+const PLAYERS={"patrick mahomes":3139477,"josh allen":3918298,"joe burrow":3915511,"ja'marr chase":4362628,"justin jefferson":4262921,"saquon barkley":3929630,"ceedee lamb":4241389,"derrick henry":3043078,"lamar jackson":3916387,"christian mccaffrey":3117251,"jalen hurts":4040715,"dak prescott":2577417,"justin herbert":4038941,"c.j. stroud":4432577,"cj stroud":4432577,"jordan love":4036378,"jared goff":3046779,"brock purdy":4361741,"drake maye":4431452,"bo nix":4426515,"davante adams":16800,"george kittle":3116164,"amon-ra st. brown":4372019,"jahmyr gibbs":4429795,"jonathan taylor":4242335,"james cook":4379399,"puka nacua":4426502,"jaxon smith-njigba":4430878,"jaylen waddle":4372016,"zay flowers":4429615,"rashee rice":4432708,"trey mcbride":4361376,"nico collins":4241372,"jordan addison":4429205,"brock bowers":4432665,"kyren williams":4429305,"javonte williams":4361777,"bucky irving":4429160,"christian watson":4362626,"tyson bagent":3912547,"jameis winston":2577327,"treveyon henderson":4685382};
+function teamCode(leg){
   const text=((leg.label||'')+' '+(leg.game||'')).toLowerCase();
-  let code='nfl';
-  for (const [name,c] of Object.entries(TEAMS)) if (text.includes(name)) code=c;
-  if (code==='nfl') return '<div class="logo"></div>';
-  return `<img class="logo" src="https://a.espncdn.com/i/teamlogos/nfl/500/${code}.png" alt="${code}" />`;
+  for (const [name,code] of Object.entries(TEAMS)) if (text.includes(name)) return code;
+  const tag=(leg.game||'').split('-')[0].toLowerCase();
+  return tag.length<=3?tag:'nfl';
+}
+function face(leg){
+  const code=teamCode(leg);
+  const logo=code==='nfl'?'':'https://a.espncdn.com/i/teamlogos/nfl/500/'+code+'.png';
+  const name=(leg.label||'').toLowerCase();
+  const player=Object.keys(PLAYERS).find(p=>name.startsWith(p));
+  if (player) return `<img class="logo" src="https://a.espncdn.com/i/headshots/nfl/players/full/${PLAYERS[player]}.png" alt="${player}" onerror="this.src='${logo}'" />`;
+  if (logo) return `<img class="logo" src="${logo}" alt="${code}" />`;
+  return '<div class="logo"></div>';
 }
 async function account(path){
   const msg=document.getElementById('gate-msg');
