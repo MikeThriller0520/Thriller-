@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>thriller desk</title>
+<link rel="icon" href="logo.svg" />
+<style>
+body{margin:0;font-family:sans-serif;background:#07070b;color:#fff}
+.wrap{max-width:860px;margin:0 auto;padding:22px}
+header{display:flex;justify-content:space-between;align-items:center}
+a{color:#ff5cab;text-decoration:none}
+input,select,button{font:inherit;background:#12121a;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 10px}
+button{background:linear-gradient(90deg,#ff2d8a,#8b5cff);border:0;cursor:pointer}
+.row{display:grid;grid-template-columns:1.6fr auto auto auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.sub{color:#9a97a6;font-size:13px}
+.hit{color:#3ee0a0}.miss{color:#ff5d73}.wait{color:#b794ff}
+form{display:grid;grid-template-columns:1.2fr 1fr .7fr .8fr .7fr auto;gap:8px;margin:12px 0 28px}
+@media(max-width:800px){form,.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><img src="logo.svg" alt="thriller" style="height:42px" /><a href="players.html">Players</a></header>
+<h1>Grade the slate</h1>
+<p class="sub">This page is not for players. Password is thriller. Hit, miss, or push. A push returns the stake.</p>
+<p><input id="pw" type="password" value="thriller" /></p>
+<form id="add">
+<input name="player" placeholder="Burrow" required />
+<select name="stat"><option>passing yards</option><option>rushing yards</option><option>receiving yards</option><option>spread</option><option>total</option><option>anytime TD</option></select>
+<input name="number" type="number" step="0.5" placeholder="265.5" required />
+<select name="side"><option>Over</option><option>Under</option><option>Cover</option><option>Yes</option></select>
+<input name="game" placeholder="CIN" />
+<button type="submit">Add line</button>
+</form>
+<h2>Lines</h2>
+<div id="legs" class="sub">Loading.</div>
+</div>
+<script>
+const pw=()=>document.getElementById('pw').value;
+function mark(s){return s==='hit'?'hit':s==='miss'?'miss':'wait';}
+async function load(){
+  const data=await fetch('/api/admin').then(r=>r.json());
+  document.getElementById('legs').innerHTML=(data.legs||[]).map(l=>`<div class="row"><div><b>${l.label}</b><div class="sub">${l.game}</div></div><span class="${mark(l.result)}">${l.result}</span><button type="button" data-id="${l.id}" data-r="hit">Hit</button><button type="button" data-id="${l.id}" data-r="miss">Miss</button><button type="button" data-id="${l.id}" data-r="push">Push</button></div>`).join('')||'<p class="sub">No lines yet.</p>';
+}
+document.getElementById('legs').onclick=async(e)=>{
+  const btn=e.target.closest('[data-id]'); if(!btn) return;
+  const res=await fetch('/api/results',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw(),leg_id:btn.dataset.id,result:btn.dataset.r})});
+  if(!res.ok){alert('Could not save'); return;} load();
+};
+document.getElementById('add').onsubmit=async(e)=>{
+  e.preventDefault();
+  const f=new FormData(e.target);
+  const res=await fetch('/api/legs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw(),player:f.get('player'),stat:f.get('stat'),number:f.get('number'),side:f.get('side'),game:f.get('game')})});
+  if(!res.ok){alert('Could not add the line'); return;} e.target.reset(); load();
+};
+load();
+</script>
+</body>
+</html>
